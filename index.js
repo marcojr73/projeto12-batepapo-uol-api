@@ -2,62 +2,125 @@ import express, { text } from "express"
 import cors from "cors"
 import dayjs from "dayjs"
 import { MongoClient } from "mongodb"
+import dotenv from "dotenv"
+
 
 const app = express()
 app.use(cors())
 app.use(express.json())
+dotenv.config()
 
 let hour = dayjs().format("HH:mm:ss")
 let date = dayjs().format("DD/MM/YYYY HH:mm:ss")
 
-//
 let db = null;
-const mongoClient = new MongoClient("mongodb://localhost:27017") 
-const promisse = mongoClient.connect();
-promisse.then(response => {
-    db = mongoClient.db("test")
-    console.log("banco de dados conectados")
-})
-promisse.catch(e => console.log("deu ruim meu patrão",e))
-//
+const mongoClient = new MongoClient(process.env.URL_MONGO) 
+console.log(process.env.URL_MONGO)
 
-let participants = []
-let messages = []
-
-app.post("/participants", (req,res) => {
+app.post("/participants", async (req,res) => {
     let { name } = req.body
-
     // validação pela biblioteca join a ser inserida aqui
 
     if(name == ""){
         res.status(422).send("Todos os campos são obrigatórios!")
         return
     }
-    const particant = {
+
+    const participant = {
         name: name,
         lastStatus: Date.now()
     }
+
     const message = {
-        from: "xxx" ,
+        from: name ,
         to: "todos" ,
         text: "entra na sala" ,
         type: "status" ,
         time: hour
     }
-    console.log(mdb)
-    res.status(201)
+
+    try{
+        await mongoClient.connect()
+        db = mongoClient.db("test")
+
+        const status = await db.collection("participants").insertOne(participant)
+        await db.collection("messages").insertOne(message)
+
+        res.send(status)
+        mongoClient.close()
+
+    } catch (e) {
+        console.log("deu ruim chefe", e)
+        res.send("deu ruim de mais")
+        mongoClient.close()
+    }
+        
 })
 
-app.get("/participants", (req, res) => {
+app.get("/participants", async (req, res) => {
+
+    try{
+        await mongoClient.connect()
+        db = mongoClient.db("test")
+
+        const participants = await db.collection("participants").find({}).toArray()
+        res.send(participants)
+        mongoClient.close()
+        return
+        
+    } catch (e) {
+        console.log("xabuuuuu", e)
+        res.send("deu ruim de mais")
+        mongoClient.close()
+    }
+
+})
+
+app.post("/messages", async (req, res) => {
+    const { to, text, type } = req.body
+    const user = req.headers.user
+
+    const message = {
+        to: to,
+        from: user,
+        type: type,
+        text: text,
+        time: hour
+    }
+
+    try {
+        await mongoClient.connect()
+        db = mongoClient.db("test")
+
+        await db.collection("messages").insertOne(message)
+        res.send("201")
+        mongoClient.close()
+    } catch (e) {
+        console.log("deu ruim chefe", e)
+        res.send("deu ruim de mais")
+        mongoClient.close()
+    }
     
 })
 
-app.post("/messages", (req, res) => {
-    
-})
+app.get("/messages", async (req, res) => {
+    const {limit} = req.query
+    const user = req.headers.user
+    console.log(limit, user)
 
-app.get("/messages", (req, res) => {
-    
+    try{
+        // find({$or: [{from:user},{to:user},{to:"todos"}]})
+        
+        await mongoClient.connect()
+        db = mongoClient.db("test")
+
+        const messages = await db.collection("messages").find({}).toArray()
+        res.send(messages)
+        mongoClient.close()
+    } catch (e) {
+        console.log("deu ruim", e)
+        mongoClient.close()
+    }
 })
 
 app.post("/status", (req, res) => {
