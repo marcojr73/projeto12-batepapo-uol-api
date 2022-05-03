@@ -26,42 +26,39 @@ const messagesSchema = joi.object({
 })
 
 app.post("/participants", async (req,res) => {
-    let { name } = req.body
     let hour = dayjs().format("HH:mm:ss")
-    // validação pela biblioteca join a ser inserida aqui
 
     const participant = {
-        name: name,
+        name: req.body.name,
         lastStatus: Date.now()
     }
 
     const message = {
-        from: name ,
-        to: "todos" ,
+        from: req.body.name ,
+        to: "Todos" ,
         text: "entra na sala" ,
         type: "status" ,
         time: hour
     }
 
     try{
-        name = await participantsSchema.validateAsync({name})
-        const available = await db.collection("participants").findOne(name)
-        console.log(available, name)
-        if(available){
-            res.send("Usuário já existente")
+        const result = await participantsSchema.validateAsync(req.body)
+        const notAvailable = await db.collection("participants").findOne({name: result.name})
+
+        if(notAvailable){
+            res.sendStatus(409)
             return
         }
+
         const status = await db.collection("participants").insertOne(participant)
         await db.collection("messages").insertOne(message)
-        res.send(status)
-        
+        res.sendStatus(201)
     } catch (e) {
-        console.log("deu ruim chefe", e)
         if(e.isJoi){
             res.sendStatus(422)
             return
         }
-        res.send("deu ruim de mais")
+        res.sendStatus(409)
     }
         
 })
@@ -69,44 +66,42 @@ app.post("/participants", async (req,res) => {
 app.get("/participants", async (req, res) => {
 
     try{
-        await mongoClient.connect()
-        db = mongoClient.db("test")
-
         const participants = await db.collection("participants").find({}).toArray()
         res.send(participants)
     } catch (e) {
-        console.log("xabuuuuu", e)
-        res.send("deu ruim de mais")
+        res.send("Ocorreu um erro ao se conectar com o servidor")
     }
 
 })
 
 app.post("/messages", async (req, res) => {
-    // const { to, text, type } = req.body
     const message = req.body
     const name = req.headers.user
     let hour = dayjs().format("HH:mm:ss")
+    console.log(name)
 
     try {
         const result =  await messagesSchema.validateAsync(message)
         const available = await db.collection("participants").findOne({name: message.to})
-    
+        const active = await db.collection("participants").findOne({name: name})
         console.log(available)
-        if(available || message.to == "Todos"){
+        console.log(active)
+
+        if(result && active && (available || message.to === "Todos")){
             message.from = name
             message.time = hour
         } else {
-            res.send("usuário nao esta no servidor")
+            res.sendStatus(422)
             return
         }
         await db.collection("messages").insertOne(message)
         res.send(message)
     } catch (e) {
         if(e.isJoi){
-            res.send("tipo de mensagem errada")
+            res.sendStatus(422)
             return
         }
-        res.send("deu ruim de mais")
+        res.sendStatus(201)
     }
     
 })
@@ -126,24 +121,52 @@ app.get("/messages", async (req, res) => {
         }
         res.send(messages)
     } catch (e) {
-        res.send("erro ao receber as mensagens")
+        res.send("erro ao enviar as mensagens")
     }
 })
 
 app.post("/status", async (req, res) => {
-    const {user} = req.headers
-
+    let user = req.headers.user;
     try {
-        await mongoClient.connect()
-        db = mongoClient.db("test")
+        
+      let userCollection = database.collection("users");
+      let userDB = await userCollection.findOne({ name: user });
+      if (userDB === null) {
+        res.sendStatus(404);
+        return;
+      }
+      await userCollection.updateOne(
+        { name: user },
+        { $set: { lastStatus: Date.now() } }
+      );
+      res.sendStatus(200);
 
-        await db.collection("participants")
-        .updateOne({user: user}, {$set: {lastStatus: Date.now()}})
-        res.send("deve ter alterado")
-    } catch (e) {
-        console.log("erro", e)
+    } catch {
+      res.sendStatus(500);
     }
 })
+
+async function checkUsers() {
+    let hour = dayjs().format("HH:mm:ss")
+    try {
+      let participants = await db.collection("participants").find().toArray();
+      participants.forEach(user => {
+        if (Date.now() - user.lastStatus > 10000) {
+          db.collection("participants").deleteOne({ name: user.name });
+          db.collection("messages").insertOne({
+            from: user.name,
+            to: "Todos",
+            text: "sai da sala...",
+            type: "status",
+            time: hour,
+          });
+        }
+      });
+    } catch {
+        console.log("deu erro")
+    }
+  }
+  setInterval(checkUsers, 2000);
 
 app.listen(5000, () => {
     console.log("servidor em pé")
