@@ -53,6 +53,7 @@ app.post("/participants", async (req,res) => {
         const status = await db.collection("participants").insertOne(participant)
         await db.collection("messages").insertOne(message)
         res.sendStatus(201)
+
     } catch (e) {
         if(e.isJoi){
             res.sendStatus(422)
@@ -64,7 +65,6 @@ app.post("/participants", async (req,res) => {
 })
 
 app.get("/participants", async (req, res) => {
-
     try{
         const participants = await db.collection("participants").find({}).toArray()
         res.send(participants)
@@ -78,14 +78,11 @@ app.post("/messages", async (req, res) => {
     const message = req.body
     const name = req.headers.user
     let hour = dayjs().format("HH:mm:ss")
-    console.log(name)
 
     try {
         const result =  await messagesSchema.validateAsync(message)
         const available = await db.collection("participants").findOne({name: message.to})
         const active = await db.collection("participants").findOne({name: name})
-        console.log(available)
-        console.log(active)
 
         if(result && active && (available || message.to === "Todos")){
             message.from = name
@@ -103,7 +100,6 @@ app.post("/messages", async (req, res) => {
         }
         res.sendStatus(201)
     }
-    
 })
 
 app.get("/messages", async (req, res) => {
@@ -125,29 +121,29 @@ app.get("/messages", async (req, res) => {
     }
 })
 
-app.post("/status", async (req, res) => {
-    let user = req.headers.user;
-    try {
-        
-      let userCollection = database.collection("users");
-      let userDB = await userCollection.findOne({ name: user });
-      if (userDB === null) {
-        res.sendStatus(404);
-        return;
-      }
-      await userCollection.updateOne(
-        { name: user },
-        { $set: { lastStatus: Date.now() } }
-      );
-      res.sendStatus(200);
+app.post('/status', async (req, res) => {
+    const user = req.headers.user
 
-    } catch {
-      res.sendStatus(500);
+    try {
+        const available = await db.collection('participants').findOne({name: user})
+
+        if (!available) {
+            return res.sendStatus(404)
+        }
+
+        await db.collection('participants').updateOne(
+        {name: user},
+        {$set: {lastStatus: Date.now()}})
+        
+        res.sendStatus(200)
+    } catch (e) {
+        res.sendStatus(404)
     }
 })
 
 async function checkUsers() {
     let hour = dayjs().format("HH:mm:ss")
+    
     try {
       let participants = await db.collection("participants").find().toArray();
       participants.forEach(user => {
@@ -169,5 +165,5 @@ async function checkUsers() {
   setInterval(checkUsers, 2000);
 
 app.listen(5000, () => {
-    console.log("servidor em pé")
+    console.log("Servidor ativo")
 })
