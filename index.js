@@ -15,7 +15,6 @@ const mongoClient = new MongoClient(process.env.URL_MONGO)
 await mongoClient.connect()
 let db = mongoClient.db("test")
 
-
 const participantsSchema = joi.object({
     name: joi.string().min(1).required()
 })
@@ -145,25 +144,26 @@ async function checkUsers() {
     let hour = dayjs().format("HH:mm:ss")
     
     try {
-      let participants = await db.collection("participants").find().toArray();
+      let participants = await db.collection("participants").find().toArray()
       participants.forEach(user => {
         if (Date.now() - user.lastStatus > 10000) {
-          db.collection("participants").deleteOne({ name: user.name });
+          db.collection("participants").deleteOne({ name: user.name })
           db.collection("messages").insertOne({
             from: user.name,
             to: "Todos",
             text: "sai da sala...",
             type: "status",
             time: hour,
-          });
+          })
         }
-      });
+      })
     } catch {
-        console.log("deu erro")
+        console.log("ocorreu um erro ao atualizar o status dos participantes")
     }
-  }
-  setInterval(checkUsers, 2000);
+}setInterval(checkUsers, 2000)
+
+const {PORT} = process.env
 
 app.listen(5000, () => {
-    console.log("Servidor ativo")
+    console.log(`Servidor ativo na porta ${PORT}`)
 })
