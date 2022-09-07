@@ -71,7 +71,7 @@ Instale meu projeto e configure o .env como no exemplo
 | `body` |`type*` | `string` |
 * type must be 'private_message' || 'message'
 
-#### get last messages
+#### Get last messages
 
 ```
   GET /messages?limit=${numberLastMessages}
