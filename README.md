@@ -36,6 +36,7 @@ Instale meu projeto e configure o .env como no exemplo
 - Express
 - DayJs
 - Validação com Joi
+- Mongo Db
 
 ***
     
@@ -67,7 +68,8 @@ Instale meu projeto e configure o .env como no exemplo
 | :-------- |:-------- | :------- | 
 | `body` |`to` | `string` |
 | `body` |`text` | `string` |
-| `body` |`type` | `string` |
+| `body` |`type*` | `string` |
+* type must be 'private_message' || 'message'
 
 #### get last messages
 
